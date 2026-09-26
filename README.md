@@ -5,25 +5,38 @@ The body around the Phoenix brain. A stdlib-only ReAct loop
 **The model proposes; the harness disposes.** All safety gates are enforced
 in this code — never in the model.
 
-Design: `../PHOENIX_HARNESS.md` §4 (OpenManus loop + open-Jarvis feature map).
+Design: an OpenManus-style loop plus an open-Jarvis feature map. The full design doc (`PHOENIX_HARNESS.md`) lives in the private Genesis workspace, not in this repo.
 
 ## Files
 
 - `phoenix.py` — the ReAct loop + CLI. `MAX_STEPS=20`, `MAX_OBSERVE=4000`.
 - `tools.py` — the tool registry: real tools, tap-gated tools, and stubs.
-- `.selftest_fixture.txt` — fixture used by `--self-test`.
+- `.selftest_fixture.txt` — written by `--self-test` at run time (not committed).
 
 ## Tool-call protocol
 
 The model emits exactly one tool call per reply, as a fenced block:
 
-````tool:{"name":"web_search","args":{"query":"Walgreens Villa Park hiring"}} ````
+````tool:{"name":"web_search","args":{"query":"python asyncio tutorial"}} ````
 
 No native function-calling is required — this is the plain-text protocol from
 the minimal-Jarvis design, which is what Phoenix v2 will be trained on
-(see `PHOENIX_HARNESS.md` §5 for the 42 training-pair topics).
+(the training-pair topics are listed in `PHOENIX_HARNESS.md` §5, in the Genesis workspace).
 
 ## Running
+
+The harness expects to live inside the Genesis workspace:
+`~/workspace/genesis-os/phoenix-forge/harness/` (file tools are jailed to
+`~/workspace`, and run logs go to `~/workspace/genesis-os/state/`). From a
+plain clone somewhere else, `--self-test` reports `FAIL: file_read returned
+fixture` because the fixture path resolves outside the jail — place the clone
+at that path first:
+
+```bash
+mkdir -p ~/workspace/genesis-os/phoenix-forge
+git clone https://github.com/brandonduda8/phoenix-forge ~/workspace/genesis-os/phoenix-forge/harness
+cd ~/workspace/genesis-os/phoenix-forge/harness
+```
 
 ```bash
 # 3-step dry run (calc -> file_read -> terminate), prints PASS/FAIL
@@ -31,7 +44,7 @@ python3 phoenix.py --self-test
 
 # a real task with canned model replies (one reply per step,
 # steps separated by a line that is exactly "===STEP===")
-python3 phoenix.py "check the weather in Villa Park" \
+python3 phoenix.py "check the weather" \
     --model-output-file replies.txt
 
 # task from file, custom run id
@@ -46,9 +59,13 @@ never fabricated.
 
 ## Tools (43 total)
 
+Several tools wrap helper scripts from the Genesis workspace (`tools/*.py`,
+`media-generation`, `tts`) that are not part of this repo, so those tools only
+work inside that workspace.
+
 Real now: `web_search` (Bing RSS via proxy curl), `web_fetch` / `web_shot`
 (via `tools/webcrawl.py`), `weather` (Open-Meteo, no key, defaults to
-Villa Park IL), `shell`, `file_read`, `file_write`, `file_edit`, `calc`,
+the operator's home location), `shell`, `file_read`, `file_write`, `file_edit`, `calc`,
 `memory_search` (MEMORY.md + daily notes), `plan` (JSON-backed multi-step
 plans), `job_scan`, `job_stage` (wraps `tools/stage.py`), `sprint` (read),
 `money_log` (read), `growth` (read), `dragon` (read), `kaggle_run` (status only),
