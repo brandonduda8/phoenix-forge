@@ -11,7 +11,9 @@ Design: an OpenManus-style loop plus an open-Jarvis feature map. The full design
 
 - `phoenix.py` — the ReAct loop + CLI. `MAX_STEPS=20`, `MAX_OBSERVE=4000`.
 - `tools.py` — the tool registry: real tools, tap-gated tools, and stubs.
-- `.selftest_fixture.txt` — written by `--self-test` at run time (not committed).
+- `tests/` — stdlib `unittest` suite for the safety gates, file jail, shell
+  blocklist, and the loop. Run with `python3 -m unittest discover -s tests -t .`
+  (CI runs it on Python 3.11 and 3.12, plus `--self-test`).
 
 ## Tool-call protocol
 
@@ -27,19 +29,15 @@ the minimal-Jarvis design, which is what Phoenix v2 will be trained on
 
 The harness expects to live inside the Genesis workspace:
 `~/workspace/genesis-os/phoenix-forge/harness/` (file tools are jailed to
-`~/workspace`, and run logs go to `~/workspace/genesis-os/state/`). From a
-plain clone somewhere else, `--self-test` reports `FAIL: file_read returned
-fixture` because the fixture path resolves outside the jail — place the clone
-at that path first:
+`~/workspace`, and run logs go to `~/workspace/genesis-os/state/`).
+
+`--self-test` works from any clone: it re-roots the jail at a fresh temp
+directory for the duration of the test (narrower than `~/workspace`, never
+wider), writes its fixture there, and prints the transcript path. It does not
+touch `~/workspace`.
 
 ```bash
-mkdir -p ~/workspace/genesis-os/phoenix-forge
-git clone https://github.com/brandonduda8/phoenix-forge ~/workspace/genesis-os/phoenix-forge/harness
-cd ~/workspace/genesis-os/phoenix-forge/harness
-```
-
-```bash
-# 3-step dry run (calc -> file_read -> terminate), prints PASS/FAIL
+# 3-step dry run (calc -> file_read -> terminate) in a temp sandbox, prints PASS/FAIL
 python3 phoenix.py --self-test
 
 # a real task with canned model replies (one reply per step,
