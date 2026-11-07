@@ -5,6 +5,8 @@ The body around the Phoenix brain. A stdlib-only ReAct loop
 **The model proposes; the harness disposes.** All safety gates are enforced
 in this code — never in the model.
 
+Pure Python 3 standard library: no `pip install`, no third-party packages.
+
 Design: an OpenManus-style loop plus an open-Jarvis feature map. The full design doc (`PHOENIX_HARNESS.md`) lives in the private Genesis workspace, not in this repo.
 
 ## Files
@@ -54,6 +56,14 @@ Every run logs to `genesis-os/state/phoenix_runs/<run_id>/transcript.jsonl`
 (tool calls + observations + stops). `ask_brandon` writes the question to
 `ask_brandon.txt` in the run dir and **stops the run** — Brandon's answer is
 never fabricated.
+
+## Testing
+
+`python3 phoenix.py --self-test` runs a three-step dry run (calc → file_read →
+terminate) against canned model replies and prints PASS/FAIL for each check.
+From a clone outside `~/workspace/genesis-os/phoenix-forge/harness/` the
+file_read check reports FAIL by design (see Running above); the other checks
+still run. There is no unit-test suite or CI workflow yet.
 
 ## Tools (43 total)
 
@@ -113,3 +123,7 @@ the system prompt + tool specs already assembled in `run_loop`.
 Phoenix v1 (training on Kaggle as of 2026-09-21) is chat-only and cannot use
 this harness. Tool use needs the v2 fine-tune with the tool-use pairs —
 the harness is ready and waiting for it.
+
+## License
+
+[MIT](LICENSE)
