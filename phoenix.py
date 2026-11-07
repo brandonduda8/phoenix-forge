@@ -14,7 +14,7 @@ backend in behind the ModelBackend interface.
 Usage:
   phoenix.py "do X" --model-output-file replies.txt
   phoenix.py --task-file task.txt --model-output-file replies.txt
-  phoenix.py --self-test          # 3-step dry run, prints PASS/FAIL
+  phoenix.py --self-test          # 3-step dry run in a temp sandbox, prints PASS/FAIL
 
 Every run logs to genesis-os/state/phoenix_runs/<run_id>/transcript.jsonl.
 """
@@ -207,10 +207,49 @@ Both tools worked. Finishing.
 """
 
 
-def self_test():
+def _selftest_sandbox():
+    """Point the tool registry at a fresh, private temp workspace.
+
+    The self-test must pass from any clone, not only from
+    ~/workspace/genesis-os/phoenix-forge/harness. Rather than widening the
+    file jail, it temporarily re-roots the jail at an empty temp directory
+    (narrower than ~/workspace, and nothing outside it is readable). Every
+    gate keeps running unchanged; only the root they check against moves.
+    Returns a restore() callable that puts the real roots back.
+    """
     import tempfile
-    here = os.path.dirname(os.path.abspath(__file__))
-    fixture = os.path.join(here, ".selftest_fixture.txt")
+    saved = {k: getattr(T, k) for k in
+             ("WORKSPACE", "GENESIS", "TOOLS_DIR", "RUNS_DIR", "PLANS_FILE",
+              "CRON_REGISTRY")}
+    ws = os.path.realpath(tempfile.mkdtemp(prefix="phoenix-selftest-"))
+    T.WORKSPACE = ws
+    T.GENESIS = os.path.join(ws, "genesis-os")
+    T.TOOLS_DIR = os.path.join(T.GENESIS, "tools")
+    T.RUNS_DIR = os.path.join(T.GENESIS, "state", "phoenix_runs")
+    T.PLANS_FILE = os.path.join(T.GENESIS, "state", "phoenix_plans.json")
+    T.CRON_REGISTRY = os.path.join(T.GENESIS, "state", "phoenix_cron.json")
+
+    def restore():
+        for k, v in saved.items():
+            setattr(T, k, v)
+    return ws, restore
+
+
+def self_test():
+    ws, restore = _selftest_sandbox()
+    try:
+        return _self_test_in(ws)
+    finally:
+        restore()
+
+
+def _self_test_in(ws):
+    import tempfile
+    # Same relative path the canned file_read call uses, inside the sandbox
+    # workspace, so file_read is exercised through the real jail check.
+    fixture = os.path.join(ws, "genesis-os", "phoenix-forge", "harness",
+                           ".selftest_fixture.txt")
+    os.makedirs(os.path.dirname(fixture), exist_ok=True)
     with open(fixture, "w") as f:
         f.write(SELFTEST_FIXTURE + "\n")
     tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
@@ -246,7 +285,9 @@ def self_test():
     for name, passed in checks:
         print(("PASS" if passed else "FAIL") + ": " + name)
     print("SELF-TEST: " + ("PASS" if ok else "FAIL"))
-    # leave fixture + transcript on disk as proof; remove temp replies
+    # leave fixture + transcript on disk (in the temp sandbox) as proof;
+    # remove temp replies
+    print("transcript: %s" % os.path.join(run_dir, "transcript.jsonl"))
     os.unlink(tmp.name)
     return ok
 
